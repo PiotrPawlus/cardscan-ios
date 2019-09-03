@@ -10,12 +10,12 @@ import Vision
 
 @objc open class ScanBaseViewController: UIViewController, AVCaptureVideoDataOutputSampleBufferDelegate, ScanEvents, AfterPermissions {
     
-    public func onNumberRecognized(number: String, expiry: Expiry?, cardImage: CGImage, numberBoundingBox: CGRect, expiryBoundingBox: CGRect?) {
+    open func onNumberRecognized(number: String, expiry: Expiry?, cardImage: CGImage, numberBoundingBox: CGRect, expiryBoundingBox: CGRect?) {
         // relay this data to our own delegate object
         self.scanEventsDelegate?.onNumberRecognized(number: number, expiry: expiry, cardImage: cardImage, numberBoundingBox: numberBoundingBox, expiryBoundingBox: expiryBoundingBox)
     }
     
-    public func onScanComplete(scanStats: ScanStats) {
+    open func onScanComplete(scanStats: ScanStats) {
         // this shouldn't get called
     }
     
