@@ -5,7 +5,7 @@ public class Ocr {
     public var expiry: Expiry?
     
     public var errorCorrectionDuration = 1.0
-    var scanEventsDelegate: ScanEvents?
+    weak var scanEventsDelegate: ScanEvents?
     
     public init() {}
     

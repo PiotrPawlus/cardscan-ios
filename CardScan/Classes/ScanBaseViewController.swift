@@ -25,7 +25,7 @@ import Vision
     @objc public var includeCardImage = false
     @objc public var showDebugImageView = false
     
-    public var scanEventsDelegate: ScanEvents?
+    public weak var scanEventsDelegate: ScanEvents?
     
     static public let machineLearningQueue = DispatchQueue(label: "CardScanMlQueue")
     // Only access this variable from the machineLearningQueue
@@ -49,6 +49,10 @@ import Vision
     private var calledOnScannedCard = false
     
     private var ocr = Ocr()
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
     
     // Child classes should override these three functions
     @objc open func onScannedCard(number: String, expiryYear: String?, expiryMonth: String?, scannedImage: UIImage?) { }
@@ -96,9 +100,7 @@ import Vision
     
     // Only call this function from the machineLearningQueue
     static func registerAppNotifications() {
-        if hasRegisteredAppNotifications {
-            return
-        }
+        guard hasRegisteredAppNotifications else { return }
         
         hasRegisteredAppNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(willResignActive), name: UIApplication.willResignActiveNotification, object: nil)
@@ -246,9 +248,9 @@ import Vision
     
     public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         if self.machineLearningSemaphore.wait(timeout: .now()) == .success {
-            ScanViewController.machineLearningQueue.async {
+            ScanViewController.machineLearningQueue.async { [weak self] in
                 ScanBaseViewController.registerAppNotifications()
-                self.captureOutputWork(sampleBuffer: sampleBuffer)
+                self?.captureOutputWork(sampleBuffer: sampleBuffer)
             }
         }
     }
@@ -352,38 +354,36 @@ import Vision
             let embossedBoxes = self.ocr.scanStats.lastEmbossedBoxes ?? []
             let expiryBoxes = self.ocr.scanStats.expiryBoxes ?? []
             
-            DispatchQueue.main.async {
-                if self.debugImageView?.isHidden ?? false {
-                    self.debugImageView?.isHidden = false
+            DispatchQueue.main.async { [weak self] in
+                if self?.debugImageView?.isHidden ?? false {
+                    self?.debugImageView?.isHidden = false
                 }
                 
-                self.debugImageView?.image = self.drawBoundingBoxesOnImage(image: UIImage(cgImage: rawImage), embossedCharacterBoxes: embossedBoxes, characterBoxes: flatBoxes, appleBoxes: expiryBoxes)
+                self?.debugImageView?.image = self?.drawBoundingBoxesOnImage(image: UIImage(cgImage: rawImage),
+                                                                             embossedCharacterBoxes: embossedBoxes,
+                                                                             characterBoxes: flatBoxes,
+                                                                             appleBoxes: expiryBoxes)
             }
         }
         
         if done {
-            DispatchQueue.main.async {
-                guard let number = number else {
-                    return
-                }
+            DispatchQueue.main.async { [weak self] in
+                guard let number = number, let scanStats = self?.ocr.scanStats else { return }
+                guard !(self?.calledOnScannedCard ?? false) else { return }
+                self?.calledOnScannedCard = true
                 
-                if self.calledOnScannedCard {
-                    return
-                }
-                self.calledOnScannedCard = true
-                
-                ScanBaseViewController.machineLearningQueue.async {
+                ScanBaseViewController.machineLearningQueue.async { [weak self] in
                     // Note: the onNumberRecognized method is called on Ocr
-                    self.scanEventsDelegate?.onScanComplete(scanStats: self.ocr.scanStats)
+                    self?.scanEventsDelegate?.onScanComplete(scanStats: scanStats)
                 }
                 
                 let expiryMonth = expiry.map { String($0.month) }
                 let expiryYear = expiry.map { String($0.year) }
-                let image = self.scannedCardImage
+                let image = self?.scannedCardImage
                 
                 // fire and forget
-                Api.scanStats(scanStats: self.ocr.scanStats, completion: {_, _ in })
-                self.onScannedCard(number: number, expiryYear: expiryYear, expiryMonth: expiryMonth, scannedImage: image)
+                Api.scanStats(scanStats: scanStats, completion: {_, _ in })
+                self?.onScannedCard(number: number, expiryYear: expiryYear, expiryMonth: expiryMonth, scannedImage: image)
             }
         }
     }
@@ -456,8 +456,8 @@ import Vision
         
         
         // confirm videoGravity settings in previewView. Calculations based on .resizeAspectFill
-        DispatchQueue.main.async {
-            assert(self.previewView?.videoPreviewLayer.videoGravity == .resizeAspectFill)
+        DispatchQueue.main.async { [weak self] in
+            assert(self?.previewView?.videoPreviewLayer.videoGravity == .resizeAspectFill)
         }
 
         // Find out whether left/right or top/bottom of the image was cropped before it was displayed to previewView.

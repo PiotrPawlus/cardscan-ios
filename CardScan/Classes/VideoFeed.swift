@@ -33,11 +33,11 @@ class VideoFeed {
             break
             
         case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video, completionHandler: { granted in
+            AVCaptureDevice.requestAccess(for: .video, completionHandler: { [weak self] granted in
                 if !granted {
-                    self.setupResult = .notAuthorized
+                    self?.setupResult = .notAuthorized
                 }
-                self.sessionQueue.resume()
+                self?.sessionQueue.resume()
                 DispatchQueue.main.async { permissionDelegate?.permissionDidComplete(granted: granted, showedPrompt: true) }
             })
             
@@ -49,7 +49,9 @@ class VideoFeed {
     }
     
     func setup(captureDelegate: AVCaptureVideoDataOutputSampleBufferDelegate, completion: @escaping ((_ success: Bool) -> Void)) {
-        sessionQueue.async { self.configureSession(captureDelegate: captureDelegate, completion: completion) }
+        sessionQueue.async { [weak self] in
+            self?.configureSession(captureDelegate: captureDelegate, completion: completion)
+        }
     }
     
     
@@ -181,23 +183,27 @@ class VideoFeed {
     }
     
     func willAppear() {
-        sessionQueue.async {
-            switch self.setupResult {
-            case .success:
-                self.session.startRunning()
-                self.isSessionRunning = self.session.isRunning
-            case _:
-                print("could not start session")
-            }
+        sessionQueue.async { [weak self] in
+            self?.startSession()
         }
     }
     
     func willDisappear() {
-        sessionQueue.async {
-            if self.setupResult == .success {
-                self.session.stopRunning()
-                self.isSessionRunning = self.session.isRunning
-            }
+        sessionQueue.async { [weak self] in
+            self?.stopSession()
         }
+    }
+    
+    // MARK: - Private
+    private func startSession() {
+        guard self.setupResult == .success else { return }
+        self.session.startRunning()
+        self.isSessionRunning = self.session.isRunning
+    }
+    
+    private func stopSession() {
+        guard self.setupResult == .success else { return }
+        self.session.stopRunning()
+        self.isSessionRunning = self.session.isRunning
     }
 }

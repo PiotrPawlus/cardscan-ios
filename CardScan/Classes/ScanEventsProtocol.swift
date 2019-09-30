@@ -6,7 +6,7 @@
 // Both of these methods will always be invoked on the machineLearningQueue
 // serial dispatch queue.
 //
-public protocol ScanEvents {
-    mutating func onNumberRecognized(number: String, expiry: Expiry?, cardImage: CGImage, numberBoundingBox: CGRect, expiryBoundingBox: CGRect?)
-    mutating func onScanComplete(scanStats: ScanStats)
+public protocol ScanEvents: class {
+    func onNumberRecognized(number: String, expiry: Expiry?, cardImage: CGImage, numberBoundingBox: CGRect, expiryBoundingBox: CGRect?)
+    func onScanComplete(scanStats: ScanStats)
 }
